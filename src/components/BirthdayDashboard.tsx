@@ -25,7 +25,6 @@ import WishCard from '@/components/WishCard';
 import { Skeleton } from '@/components/ui/skeleton';
 
 export default function BirthdayDashboard() {
-  const [isSubmitted, setIsSubmitted] = useState(false);
   const [showAreYouRichardPrompt, setShowAreYouRichardPrompt] = useState(false);
   const [showPasswordPrompt, setShowPasswordPrompt] = useState(false);
   const [password, setPassword] = useState('');
@@ -33,10 +32,6 @@ export default function BirthdayDashboard() {
   const [wishes, setWishes] = useState<Wish[]>([]);
   const [isLoadingWishes, setIsLoadingWishes] = useState(false);
   const { toast } = useToast();
-  
-  const handleWishAdded = () => {
-    setIsSubmitted(true);
-  };
 
   const openPasswordPrompt = () => {
     setShowAreYouRichardPrompt(false);
@@ -131,19 +126,7 @@ export default function BirthdayDashboard() {
       </header>
       
       <div className="w-full max-w-2xl mb-12 z-10">
-        {isSubmitted ? (
-          <Card className="w-full max-w-2xl mx-auto shadow-2xl bg-card text-center p-8 md:p-12">
-            <CardContent className="pt-6">
-              <Gift className="h-16 w-16 text-accent mx-auto mb-6" />
-              <h2 className="text-3xl font-bold font-headline text-primary-foreground/90 mb-4">Thank You!</h2>
-              <p className="text-muted-foreground text-lg">
-                Your wish has been sent. It will surely make Richard's day even brighter!
-              </p>
-            </CardContent>
-          </Card>
-        ) : (
-          <WishForm onWishAdded={handleWishAdded} addWishAction={addWish} />
-        )}
+        <WishForm addWishAction={addWish} />
       </div>
 
        <footer className="mt-12 text-center text-muted-foreground text-sm">

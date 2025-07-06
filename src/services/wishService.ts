@@ -4,6 +4,7 @@ import { db } from '@/lib/firebase';
 import { collection, getDocs, addDoc, query, orderBy, serverTimestamp, writeBatch, Timestamp, doc } from 'firebase/firestore';
 import type { Wish } from '@/lib/types';
 import { initialWishes } from '@/lib/store';
+import { revalidatePath } from 'next/cache';
 
 const WISHES_COLLECTION = 'wishes';
 
@@ -59,6 +60,12 @@ export async function getWishesWithPassword(password: string): Promise<Wish[] | 
 
   if (!correctPassword) {
     console.error("WISHES_PASSWORD environment variable not set.");
+    // Fallback for local dev if env is not set.
+    if (process.env.NODE_ENV === 'development') {
+      if (password === 'birthday2024') {
+        return getWishes();
+      }
+    }
     return null;
   }
 
@@ -82,6 +89,8 @@ export async function addWish(wishData: Omit<Wish, 'id' | 'createdAt'>): Promise
     ...wishData,
     createdAt: serverTimestamp(),
   });
+
+  revalidatePath('/');
 
   return { 
     id: docRef.id, 
