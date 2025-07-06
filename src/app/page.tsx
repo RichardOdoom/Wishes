@@ -1,3 +1,9 @@
+import BirthdayDashboard from '@/components/BirthdayDashboard';
+
 export default function Home() {
-  return <></>;
+  return (
+    <main>
+      <BirthdayDashboard />
+    </main>
+  );
 }
