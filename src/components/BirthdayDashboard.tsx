@@ -22,7 +22,9 @@ import { useToast } from '@/hooks/use-toast';
 import type { Wish } from '@/lib/types';
 import WishCard from '@/components/WishCard';
 import { Skeleton } from '@/components/ui/skeleton';
-import { supabase } from '@/lib/supabase';
+import { db } from '@/lib/firebase';
+import { collection, onSnapshot, query, orderBy, Timestamp } from 'firebase/firestore';
+
 
 export default function BirthdayDashboard() {
   const [showAreYouRichardPrompt, setShowAreYouRichardPrompt] = useState(false);
@@ -39,54 +41,57 @@ export default function BirthdayDashboard() {
   }
 
   useEffect(() => {
-    if (!showWishes || !supabase) {
+    if (!showWishes) {
+      return;
+    }
+    
+    if (!db) {
+      console.warn("Cannot show wishes, Firebase is not configured.");
+      toast({
+        variant: "destructive",
+        title: "Database not configured",
+        description: "Please set up your Firebase credentials to see wishes.",
+      });
+      setShowWishes(false);
       return;
     }
 
-    const fetchAndSubscribe = async () => {
-      setIsLoadingWishes(true);
-      
-      await seedInitialWishes();
+    setIsLoadingWishes(true);
+    seedInitialWishes(); // Seed if needed
 
-      const { data, error } = await supabase
-        .from('wishes')
-        .select('*')
-        .order('created_at', { ascending: false });
+    const wishesCollection = collection(db, 'wishes');
+    const q = query(wishesCollection, orderBy('createdAt', 'desc'));
 
-      if (error) {
-        console.error("Failed to fetch wishes:", error);
-        toast({
-          variant: "destructive",
-          title: "Failed to load wishes",
-          description: "Could not retrieve birthday wishes. Please try again later.",
-        });
-      } else if (data) {
-        const fetchedWishes: Wish[] = data.map(w => ({ ...w, id: w.id.toString(), createdAt: w.created_at }));
-        setWishes(fetchedWishes);
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      // Ignore local cache updates until the server confirms the write to avoid flickering
+      if (snapshot.metadata.hasPendingWrites) {
+        return;
       }
+
+      const wishesData: Wish[] = snapshot.docs.map(doc => {
+        const data = doc.data();
+        const createdAtDate = (data.createdAt as Timestamp)?.toDate ? (data.createdAt as Timestamp).toDate() : new Date();
+        return {
+          id: doc.id,
+          name: data.name,
+          message: data.message,
+          createdAt: createdAtDate.toISOString(),
+        };
+      });
+      setWishes(wishesData);
       setIsLoadingWishes(false);
-    };
-
-    fetchAndSubscribe();
-
-    const channel = supabase.channel('wishes-realtime-channel')
-      .on(
-        'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'wishes' },
-        (payload) => {
-          const newWish = {
-            ...payload.new,
-            id: payload.new.id.toString(),
-            createdAt: payload.new.created_at,
-          } as Wish;
-          
-          setWishes((currentWishes) => [newWish, ...currentWishes]);
-        }
-      )
-      .subscribe();
+    }, (error) => {
+      console.error("Failed to listen for wishes:", error);
+      toast({
+        variant: "destructive",
+        title: "Failed to load wishes",
+        description: "Could not retrieve birthday wishes in real-time.",
+      });
+      setIsLoadingWishes(false);
+    });
 
     return () => {
-      supabase.removeChannel(channel);
+      unsubscribe();
     };
   }, [showWishes, toast]);
 
@@ -159,7 +164,7 @@ export default function BirthdayDashboard() {
             ) : (
               <Card className="flex flex-col items-center justify-center p-12 text-center bg-card">
                 <h3 className="text-xl font-semibold mb-2">The wall is empty!</h3>
-                <p className="text-muted-foreground">No wishes yet. Be the first to seed some!</p>
+                <p className="text-muted-foreground">No wishes yet. Be the first to share the link!</p>
               </Card>
             )}
           </div>

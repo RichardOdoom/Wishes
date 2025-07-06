@@ -1,41 +1,46 @@
 'use server';
 
-import { supabase } from '@/lib/supabase';
+import { db } from '@/lib/firebase';
 import type { Wish } from '@/lib/types';
 import { initialWishes } from '@/lib/store';
+import { collection, getDocs, addDoc, serverTimestamp } from 'firebase/firestore';
 
 async function seedWishes() {
-  if (!supabase) {
-    console.warn("Cannot seed wishes, Supabase is not configured.");
+  if (!db) {
+    console.warn("Cannot seed wishes, Firebase is not configured.");
     return;
   }
   
-  const wishesToSeed = initialWishes.map(({ name, message }) => ({ name, message }));
+  try {
+    const wishesToSeed = initialWishes.map(({ name, message }) => ({
+      name,
+      message,
+      createdAt: serverTimestamp()
+    }));
 
-  const { error } = await supabase.from('wishes').insert(wishesToSeed);
-
-  if (error) {
-    console.error('Error seeding database:', error);
-  } else {
+    const wishesCollection = collection(db, 'wishes');
+    for (const wish of wishesToSeed) {
+      await addDoc(wishesCollection, wish);
+    }
     console.log('Database seeded with initial wishes successfully!');
+  } catch (error) {
+    console.error('Error seeding database:', error);
   }
 }
 
 export async function seedInitialWishes() {
-    if (!supabase) return;
+    if (!db) return;
 
-    const { count, error } = await supabase
-      .from('wishes')
-      .select('*', { count: 'exact', head: true });
-
-    if (error) {
-      console.error("Could not check for wishes:", error.message);
-      return;
-    }
-    
-    if (count === 0) {
-        console.log('No wishes found, seeding database...');
-        await seedWishes();
+    try {
+      const wishesCollection = collection(db, 'wishes');
+      const snapshot = await getDocs(wishesCollection);
+      
+      if (snapshot.empty) {
+          console.log('No wishes found, seeding database...');
+          await seedWishes();
+      }
+    } catch (error) {
+       console.error("Could not check for wishes:", error);
     }
 }
 
@@ -55,25 +60,28 @@ export async function checkPassword(password: string): Promise<boolean> {
 }
 
 export async function addWish(wishData: Omit<Wish, 'id' | 'createdAt'>): Promise<Wish> {
-  if (!supabase) {
-    console.warn("Supabase not configured. This wish will not be saved.");
+  if (!db) {
+    console.warn("Firebase not configured. This wish will not be saved.");
     const newWish: Wish = { ...wishData, id: `static-id-${Date.now()}`, createdAt: new Date().toISOString() };
     return newWish;
   }
 
-  const { data, error } = await supabase
-    .from('wishes')
-    .insert([{ name: wishData.name, message: wishData.message }])
-    .select()
-    .single();
+  try {
+    const wishesCollection = collection(db, 'wishes');
+    const docRef = await addDoc(wishesCollection, {
+      ...wishData,
+      createdAt: serverTimestamp()
+    });
 
-  if (error) {
+    // The real-time listener will handle updating the UI with the correct data.
+    // This return is mostly for optimistic updates if we weren't using real-time.
+    return {
+      ...wishData,
+      id: docRef.id,
+      createdAt: new Date().toISOString(), 
+    };
+  } catch (error) {
     console.error('Failed to add wish:', error);
     throw new Error('Could not save wish to the database.');
   }
-
-  return {
-    ...data,
-    createdAt: data.created_at,
-  };
 }
