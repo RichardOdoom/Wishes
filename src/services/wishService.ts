@@ -1,5 +1,6 @@
 'use server';
 
+import { unstable_noStore as noStore } from 'next/cache';
 import { db } from '@/lib/firebase';
 import { collection, getDocs, addDoc, query, orderBy, serverTimestamp, writeBatch, Timestamp, doc } from 'firebase/firestore';
 import type { Wish } from '@/lib/types';
@@ -36,6 +37,7 @@ async function seedWishes() {
 }
 
 export async function getWishes(): Promise<Wish[]> {
+  noStore();
   if (!db) {
     console.warn("Firebase not configured. Returning initial static data.");
     return initialWishes.map((w, i) => ({ ...w, id: `static-id-${i}`}));
