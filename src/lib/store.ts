@@ -12,7 +12,7 @@ export const initialProfiles: Profile[] = [
   {
     id: '1',
     name: 'Mom',
-    birthdate: new Date(new Date().getFullYear(), 4, 20), // Set to May 20 of current year for demo
+    birthdate: new Date(1970, 4, 20),
     description: 'The best mom in the world. Loves gardening and cooking. Always there for me with a warm hug and good advice.',
     photoUrl: 'https://placehold.co/400x400.png',
     categoryId: 'family',
@@ -20,7 +20,7 @@ export const initialProfiles: Profile[] = [
   {
     id: '2',
     name: 'Alex',
-    birthdate: new Date(new Date().getFullYear(), new Date().getMonth(), new Date().getDate()), // Set to today for demo
+    birthdate: new Date(1995, 6, 25),
     description: 'My best friend since college. We share a love for hiking, indie movies, and trying out new coffee shops. Alex has a dog named "Buddy".',
     photoUrl: 'https://placehold.co/400x400.png',
     categoryId: 'friends',
@@ -28,7 +28,7 @@ export const initialProfiles: Profile[] = [
   {
     id: '3',
     name: 'Jane Doe',
-    birthdate: new Date(new Date().getFullYear(), new Date().getMonth(), new Date().getDate() + 5), // Set to 5 days from now for demo
+    birthdate: new Date(1988, 7, 1),
     description: 'A talented designer I work with. Very creative and always brings a positive attitude to the team. Big fan of sci-fi novels.',
     photoUrl: 'https://placehold.co/400x400.png',
     categoryId: 'coworkers',

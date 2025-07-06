@@ -13,6 +13,8 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Cake, Edit } from 'lucide-react';
 import GenerateMessage from './GenerateMessage';
+import { useState, useEffect } from 'react';
+import { Skeleton } from './ui/skeleton';
 
 interface ProfileDetailProps {
   isOpen: boolean;
@@ -22,13 +24,24 @@ interface ProfileDetailProps {
 }
 
 export default function ProfileDetail({ isOpen, setIsOpen, profile, onEdit }: ProfileDetailProps) {
-  const isBirthdayToday = () => {
-    const today = new Date();
-    return (
-      profile.birthdate.getDate() === today.getDate() &&
-      profile.birthdate.getMonth() === today.getMonth()
-    );
-  };
+  const [isBirthday, setIsBirthday] = useState(false);
+  const [birthDateString, setBirthDateString] = useState('');
+
+  useEffect(() => {
+    if (isOpen) {
+      const today = new Date();
+      const isBirthdayToday =
+        profile.birthdate.getDate() === today.getDate() &&
+        profile.birthdate.getMonth() === today.getMonth();
+      setIsBirthday(isBirthdayToday);
+
+      setBirthDateString(profile.birthdate.toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+      }));
+    }
+  }, [isOpen, profile.birthdate]);
   
   const handleEditClick = () => {
     setIsOpen(false);
@@ -47,7 +60,7 @@ export default function ProfileDetail({ isOpen, setIsOpen, profile, onEdit }: Pr
                 objectFit="cover"
                 data-ai-hint="person portrait"
               />
-               {isBirthdayToday() && (
+               {isBirthday && (
                 <Badge className="absolute top-2 right-2 bg-primary text-primary-foreground animate-pulse z-10">
                   <Cake className="mr-2 h-4 w-4" />
                   Happy Birthday!
@@ -58,11 +71,7 @@ export default function ProfileDetail({ isOpen, setIsOpen, profile, onEdit }: Pr
             <div>
               <DialogTitle className="text-3xl font-headline">{profile.name}</DialogTitle>
               <DialogDescription>
-                Birthday: {profile.birthdate.toLocaleDateString('en-US', {
-                  year: 'numeric',
-                  month: 'long',
-                  day: 'numeric',
-                })}
+                {birthDateString ? `Birthday: ${birthDateString}` : <Skeleton className="h-5 w-48" />}
               </DialogDescription>
             </div>
             <Button variant="ghost" size="icon" onClick={handleEditClick}>
