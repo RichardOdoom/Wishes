@@ -8,6 +8,7 @@ import { Cake } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import ProfileDetail from './ProfileDetail';
 import { Skeleton } from './ui/skeleton';
+import { parseISO } from 'date-fns';
 
 interface ProfileCardProps {
   profile: Profile;
@@ -21,12 +22,16 @@ export default function ProfileCard({ profile, onEdit }: ProfileCardProps) {
 
   useEffect(() => {
     const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const birthdate = parseISO(profile.birthdate);
+
     const isBirthdayToday =
-      profile.birthdate.getDate() === today.getDate() &&
-      profile.birthdate.getMonth() === today.getMonth();
+      birthdate.getDate() === today.getDate() &&
+      birthdate.getMonth() === today.getMonth();
     setIsBirthday(isBirthdayToday);
 
-    setBirthDateString(profile.birthdate.toLocaleDateString('en-US', {
+    setBirthDateString(birthdate.toLocaleDateString('en-US', {
       month: 'long',
       day: 'numeric',
     }));

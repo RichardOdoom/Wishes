@@ -15,6 +15,7 @@ import { Cake, Edit } from 'lucide-react';
 import GenerateMessage from './GenerateMessage';
 import { useState, useEffect } from 'react';
 import { Skeleton } from './ui/skeleton';
+import { parseISO } from 'date-fns';
 
 interface ProfileDetailProps {
   isOpen: boolean;
@@ -30,12 +31,16 @@ export default function ProfileDetail({ isOpen, setIsOpen, profile, onEdit }: Pr
   useEffect(() => {
     if (isOpen) {
       const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
+      const birthdate = parseISO(profile.birthdate);
+
       const isBirthdayToday =
-        profile.birthdate.getDate() === today.getDate() &&
-        profile.birthdate.getMonth() === today.getMonth();
+        birthdate.getDate() === today.getDate() &&
+        birthdate.getMonth() === today.getMonth();
       setIsBirthday(isBirthdayToday);
 
-      setBirthDateString(profile.birthdate.toLocaleDateString('en-US', {
+      setBirthDateString(birthdate.toLocaleDateString('en-US', {
         year: 'numeric',
         month: 'long',
         day: 'numeric',

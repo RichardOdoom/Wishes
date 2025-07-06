@@ -9,7 +9,7 @@ export interface Category {
 export interface Profile {
   id: string;
   name: string;
-  birthdate: Date;
+  birthdate: string;
   description: string;
   photoUrl: string;
   categoryId: string;

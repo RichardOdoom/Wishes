@@ -1,18 +1,21 @@
 "use client";
 
 import { useState, useEffect, useMemo } from 'react';
-import { initialCategories, initialProfiles } from '@/lib/store';
+import { initialCategories } from '@/lib/store';
 import type { Profile, Category } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { PlusCircle, Gift } from 'lucide-react';
-import { differenceInDays } from 'date-fns';
+import { PlusCircle, Gift, Loader2 } from 'lucide-react';
+import { differenceInDays, parseISO } from 'date-fns';
 import { useToast } from "@/hooks/use-toast";
 import ProfileCard from './ProfileCard';
 import ProfileForm from './ProfileForm';
+import { getProfiles, addProfile, updateProfile } from '@/services/profileService';
+import { Skeleton } from './ui/skeleton';
 
 export default function BirthdayDashboard() {
-  const [profiles, setProfiles] = useState<Profile[]>(initialProfiles);
+  const [profiles, setProfiles] = useState<Profile[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [categories] = useState<Category[]>(initialCategories);
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -21,13 +24,37 @@ export default function BirthdayDashboard() {
   const { toast } = useToast();
 
   useEffect(() => {
+    async function loadProfiles() {
+      try {
+        setIsLoading(true);
+        const fetchedProfiles = await getProfiles();
+        setProfiles(fetchedProfiles);
+      } catch (error) {
+        console.error("Failed to fetch profiles:", error);
+        toast({
+          variant: "destructive",
+          title: "Failed to load data",
+          description: "Could not retrieve birthday profiles. Please try again later.",
+        });
+      } finally {
+        setIsLoading(false);
+      }
+    }
+    loadProfiles();
+  }, [toast]);
+
+
+  useEffect(() => {
+    if (isLoading) return;
+
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
     profiles.forEach(profile => {
-      const birthDateThisYear = new Date(today.getFullYear(), profile.birthdate.getMonth(), profile.birthdate.getDate());
+      const birthdate = parseISO(profile.birthdate);
+      const birthDateThisYear = new Date(today.getFullYear(), birthdate.getMonth(), birthdate.getDate());
       const nextBirthday = birthDateThisYear < today
-        ? new Date(today.getFullYear() + 1, profile.birthdate.getMonth(), profile.birthdate.getDate())
+        ? new Date(today.getFullYear() + 1, birthdate.getMonth(), birthdate.getDate())
         : birthDateThisYear;
       
       const daysUntil = differenceInDays(nextBirthday, today);
@@ -44,15 +71,28 @@ export default function BirthdayDashboard() {
         });
       }
     });
-  }, [profiles, toast]);
+  }, [profiles, toast, isLoading]);
 
-  const handleSaveProfile = (profile: Profile) => {
-    if (editingProfile) {
-      setProfiles(profiles.map(p => (p.id === profile.id ? profile : p)));
-    } else {
-      setProfiles([...profiles, { ...profile, id: Date.now().toString() }]);
+  const handleSaveProfile = async (profileData: Omit<Profile, 'id'>) => {
+    try {
+      if (editingProfile) {
+        const updatedProfile = await updateProfile({ ...profileData, id: editingProfile.id });
+        setProfiles(profiles.map(p => (p.id === updatedProfile.id ? updatedProfile : p)));
+        toast({ title: "Profile updated!" });
+      } else {
+        const newProfile = await addProfile(profileData);
+        setProfiles([...profiles, newProfile]);
+        toast({ title: "Profile added!" });
+      }
+      setEditingProfile(null);
+    } catch (error) {
+      console.error("Failed to save profile:", error);
+      toast({
+        variant: "destructive",
+        title: "Save failed",
+        description: "Could not save the profile. Please try again.",
+      });
     }
-    setEditingProfile(null);
   };
 
   const handleAddNew = () => {
@@ -71,6 +111,7 @@ export default function BirthdayDashboard() {
     }
     return profiles.filter(p => p.categoryId === selectedCategory);
   }, [profiles, selectedCategory]);
+  
 
   return (
     <div className="flex min-h-screen w-full bg-background font-body">
@@ -100,7 +141,19 @@ export default function BirthdayDashboard() {
           </Button>
         </header>
 
-        {filteredProfiles.length > 0 ? (
+        {isLoading ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                {[...Array(4)].map((_, i) => (
+                    <Card key={i}>
+                        <Skeleton className="w-full h-56"/>
+                        <div className="p-4 space-y-2">
+                            <Skeleton className="h-6 w-1/2"/>
+                            <Skeleton className="h-4 w-1/3"/>
+                        </div>
+                    </Card>
+                ))}
+            </div>
+        ) : filteredProfiles.length > 0 ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
             {filteredProfiles.map(profile => (
               <ProfileCard key={profile.id} profile={profile} onEdit={handleEdit} />

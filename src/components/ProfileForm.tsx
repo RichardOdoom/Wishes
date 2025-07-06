@@ -30,7 +30,7 @@ import { CalendarIcon } from 'lucide-react';
 import { Calendar } from '@/components/ui/calendar';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
-import { format } from 'date-fns';
+import { format, parseISO } from 'date-fns';
 
 const profileSchema = z.object({
   name: z.string().min(2, "Name must be at least 2 characters."),
@@ -45,7 +45,7 @@ type ProfileFormValues = z.infer<typeof profileSchema>;
 interface ProfileFormProps {
   isOpen: boolean;
   setIsOpen: (open: boolean) => void;
-  onSave: (profile: Profile) => void;
+  onSave: (profile: Omit<Profile, 'id'>) => void;
   profile: Profile | null;
   categories: Category[];
 }
@@ -61,15 +61,15 @@ export default function ProfileForm({ isOpen, setIsOpen, onSave, profile, catego
   });
 
   useEffect(() => {
-    if (profile) {
+    if (isOpen && profile) {
       form.reset({
         name: profile.name,
-        birthdate: profile.birthdate,
+        birthdate: parseISO(profile.birthdate),
         description: profile.description,
         photoUrl: profile.photoUrl,
         categoryId: profile.categoryId,
       });
-    } else {
+    } else if (isOpen && !profile) {
       form.reset({
         name: '',
         birthdate: undefined,
@@ -83,10 +83,12 @@ export default function ProfileForm({ isOpen, setIsOpen, onSave, profile, catego
   const onSubmit = (data: ProfileFormValues) => {
     const photoUrl = data.photoUrl || `https://placehold.co/400x400.png`;
     onSave({
-      ...data,
-      id: profile?.id || '',
+      name: data.name,
+      birthdate: data.birthdate.toISOString(),
+      description: data.description,
+      categoryId: data.categoryId,
       photoUrl: photoUrl,
-    } as Profile);
+    });
     setIsOpen(false);
   };
 
