@@ -1,10 +1,10 @@
 "use client";
 
-import { useState } from 'react';
-import { addWish } from '@/services/wishService';
+import { useState, useEffect } from 'react';
+import { addWish, checkPassword, seedInitialWishes } from '@/services/wishService';
 import WishForm from './WishForm';
 import { Card, CardContent } from './ui/card';
-import { Gift, PartyPopper } from 'lucide-react';
+import { PartyPopper } from 'lucide-react';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -20,9 +20,10 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
 import type { Wish } from '@/lib/types';
-import { getWishesWithPassword } from '@/services/wishService';
 import WishCard from '@/components/WishCard';
 import { Skeleton } from '@/components/ui/skeleton';
+import { db } from '@/lib/firebase';
+import { collection, onSnapshot, query, orderBy, Timestamp } from 'firebase/firestore';
 
 export default function BirthdayDashboard() {
   const [showAreYouRichardPrompt, setShowAreYouRichardPrompt] = useState(false);
@@ -38,13 +39,53 @@ export default function BirthdayDashboard() {
     setShowPasswordPrompt(true);
   }
 
+  useEffect(() => {
+    if (!showWishes || !db) {
+      return;
+    }
+
+    setIsLoadingWishes(true);
+    const wishesCollection = collection(db, 'wishes');
+    const q = query(wishesCollection, orderBy('createdAt', 'desc'));
+
+    const unsubscribe = onSnapshot(q, async (snapshot) => {
+      if (snapshot.empty) {
+        await seedInitialWishes();
+      }
+      
+      const fetchedWishes: Wish[] = snapshot.docs.map(doc => {
+        const data = doc.data();
+        const createdAt = (data.createdAt as Timestamp)?.toDate()?.toISOString() ?? new Date().toISOString();
+        return {
+          id: doc.id,
+          name: data.name,
+          message: data.message,
+          createdAt,
+        };
+      });
+      
+      setWishes(fetchedWishes);
+      setIsLoadingWishes(false);
+    }, (error) => {
+      console.error("Failed to fetch wishes in real-time:", error);
+      toast({
+        variant: "destructive",
+        title: "Failed to load wishes",
+        description: "Could not retrieve birthday wishes. Please try again later.",
+      });
+      setIsLoadingWishes(false);
+    });
+
+    return () => unsubscribe();
+
+  }, [showWishes, toast]);
+
   const handlePasswordSubmit = async () => {
     setIsLoadingWishes(true);
     try {
-      const fetchedWishes = await getWishesWithPassword(password);
+      const isCorrect = await checkPassword(password);
       
-      if (fetchedWishes) {
-        setWishes(fetchedWishes);
+      if (isCorrect) {
         setShowPasswordPrompt(false);
         setShowWishes(true);
       } else {
@@ -54,15 +95,15 @@ export default function BirthdayDashboard() {
           description: "Sorry, You are not the birthday boy okaaayy",
         });
         setPassword('');
+        setIsLoadingWishes(false);
       }
     } catch (error) {
-      console.error("Failed to fetch wishes:", error);
+      console.error("Failed to check password:", error);
       toast({
         variant: "destructive",
-        title: "Failed to load wishes",
-        description: "Could not retrieve birthday wishes. Please try again later.",
+        title: "Authentication Failed",
+        description: "Could not verify password. Please try again later.",
       });
-    } finally {
       setIsLoadingWishes(false);
     }
   };

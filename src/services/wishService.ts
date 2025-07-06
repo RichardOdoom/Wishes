@@ -1,24 +1,11 @@
 'use server';
 
-import { unstable_noStore as noStore } from 'next/cache';
 import { db } from '@/lib/firebase';
 import { collection, getDocs, addDoc, query, orderBy, serverTimestamp, writeBatch, Timestamp, doc } from 'firebase/firestore';
 import type { Wish } from '@/lib/types';
 import { initialWishes } from '@/lib/store';
-import { revalidatePath } from 'next/cache';
 
 const WISHES_COLLECTION = 'wishes';
-
-const mapDocToWish = (doc: any): Wish => {
-  const data = doc.data();
-  const createdAt = (data.createdAt as Timestamp)?.toDate()?.toISOString() ?? new Date().toISOString();
-  return {
-    id: doc.id,
-    name: data.name,
-    message: data.message,
-    createdAt,
-  };
-};
 
 async function seedWishes() {
   if (!db) {
@@ -36,46 +23,29 @@ async function seedWishes() {
   console.log('Database seeded with initial wishes successfully!');
 }
 
-export async function getWishes(): Promise<Wish[]> {
-  noStore();
-  if (!db) {
-    console.warn("Firebase not configured. Returning initial static data.");
-    return initialWishes.map((w, i) => ({ ...w, id: `static-id-${i}`}));
-  }
-
-  const wishesCollection = collection(db, WISHES_COLLECTION);
-  const q = query(wishesCollection, orderBy('createdAt', 'desc'));
-  const snapshot = await getDocs(q);
-  
-  if (snapshot.empty) {
-    console.log('No wishes found, seeding database...');
-    await seedWishes();
-    const seededSnapshot = await getDocs(q);
-    return seededSnapshot.docs.map(mapDocToWish);
-  }
-  
-  return snapshot.docs.map(mapDocToWish);
+export async function seedInitialWishes() {
+    if (!db) return;
+    const wishesCollection = collection(db, WISHES_COLLECTION);
+    const snapshot = await getDocs(wishesCollection);
+    if (snapshot.empty) {
+        console.log('No wishes found, seeding database...');
+        await seedWishes();
+    }
 }
 
-export async function getWishesWithPassword(password: string): Promise<Wish[] | null> {
+export async function checkPassword(password: string): Promise<boolean> {
   const correctPassword = process.env.WISHES_PASSWORD;
 
   if (!correctPassword) {
     console.error("WISHES_PASSWORD environment variable not set.");
     // Fallback for local dev if env is not set.
     if (process.env.NODE_ENV === 'development') {
-      if (password === 'birthday2024') {
-        return getWishes();
-      }
+      return password === 'birthday2024';
     }
-    return null;
+    return false;
   }
 
-  if (password === correctPassword) {
-    return getWishes();
-  }
-  
-  return null;
+  return password === correctPassword;
 }
 
 export async function addWish(wishData: Omit<Wish, 'id' | 'createdAt'>): Promise<Wish> {
@@ -91,8 +61,6 @@ export async function addWish(wishData: Omit<Wish, 'id' | 'createdAt'>): Promise
     ...wishData,
     createdAt: serverTimestamp(),
   });
-
-  revalidatePath('/');
 
   return { 
     id: docRef.id, 
