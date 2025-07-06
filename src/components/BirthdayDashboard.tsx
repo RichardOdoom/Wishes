@@ -22,8 +22,7 @@ import { useToast } from '@/hooks/use-toast';
 import type { Wish } from '@/lib/types';
 import WishCard from '@/components/WishCard';
 import { Skeleton } from '@/components/ui/skeleton';
-import { db } from '@/lib/firebase';
-import { collection, onSnapshot, query, orderBy, Timestamp } from 'firebase/firestore';
+import { supabase } from '@/lib/supabase';
 
 export default function BirthdayDashboard() {
   const [showAreYouRichardPrompt, setShowAreYouRichardPrompt] = useState(false);
@@ -40,44 +39,55 @@ export default function BirthdayDashboard() {
   }
 
   useEffect(() => {
-    if (!showWishes || !db) {
+    if (!showWishes || !supabase) {
       return;
     }
 
-    setIsLoadingWishes(true);
-    const wishesCollection = collection(db, 'wishes');
-    const q = query(wishesCollection, orderBy('createdAt', 'desc'));
+    const fetchAndSubscribe = async () => {
+      setIsLoadingWishes(true);
+      
+      await seedInitialWishes();
 
-    const unsubscribe = onSnapshot(q, async (snapshot) => {
-      if (snapshot.empty) {
-        await seedInitialWishes();
+      const { data, error } = await supabase
+        .from('wishes')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        console.error("Failed to fetch wishes:", error);
+        toast({
+          variant: "destructive",
+          title: "Failed to load wishes",
+          description: "Could not retrieve birthday wishes. Please try again later.",
+        });
+      } else if (data) {
+        const fetchedWishes: Wish[] = data.map(w => ({ ...w, id: w.id.toString(), createdAt: w.created_at }));
+        setWishes(fetchedWishes);
       }
-      
-      const fetchedWishes: Wish[] = snapshot.docs.map(doc => {
-        const data = doc.data();
-        const createdAt = (data.createdAt as Timestamp)?.toDate()?.toISOString() ?? new Date().toISOString();
-        return {
-          id: doc.id,
-          name: data.name,
-          message: data.message,
-          createdAt,
-        };
-      });
-      
-      setWishes(fetchedWishes);
       setIsLoadingWishes(false);
-    }, (error) => {
-      console.error("Failed to fetch wishes in real-time:", error);
-      toast({
-        variant: "destructive",
-        title: "Failed to load wishes",
-        description: "Could not retrieve birthday wishes. Please try again later.",
-      });
-      setIsLoadingWishes(false);
-    });
+    };
 
-    return () => unsubscribe();
+    fetchAndSubscribe();
 
+    const channel = supabase.channel('wishes-realtime-channel')
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'wishes' },
+        (payload) => {
+          const newWish = {
+            ...payload.new,
+            id: payload.new.id.toString(),
+            createdAt: payload.new.created_at,
+          } as Wish;
+          
+          setWishes((currentWishes) => [newWish, ...currentWishes]);
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, [showWishes, toast]);
 
   const handlePasswordSubmit = async () => {
@@ -149,7 +159,7 @@ export default function BirthdayDashboard() {
             ) : (
               <Card className="flex flex-col items-center justify-center p-12 text-center bg-card">
                 <h3 className="text-xl font-semibold mb-2">The wall is empty!</h3>
-                <p className="text-muted-foreground">No wishes yet. Share your link!</p>
+                <p className="text-muted-foreground">No wishes yet. Be the first to seed some!</p>
               </Card>
             )}
           </div>
