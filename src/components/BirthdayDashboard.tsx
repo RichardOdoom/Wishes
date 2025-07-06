@@ -20,7 +20,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
 import type { Wish } from '@/lib/types';
-import { getWishes } from '@/services/wishService';
+import { getWishesWithPassword } from '@/services/wishService';
 import WishCard from '@/components/WishCard';
 import { Skeleton } from '@/components/ui/skeleton';
 
@@ -44,30 +44,31 @@ export default function BirthdayDashboard() {
   }
 
   const handlePasswordSubmit = async () => {
-    if (password === 'birthday2024') { 
-      setShowPasswordPrompt(false);
-      setShowWishes(true);
-      setIsLoadingWishes(true);
-      try {
-        const fetchedWishes = await getWishes();
+    setIsLoadingWishes(true);
+    try {
+      const fetchedWishes = await getWishesWithPassword(password);
+      
+      if (fetchedWishes) {
         setWishes(fetchedWishes);
-      } catch (error) {
-        console.error("Failed to fetch wishes:", error);
+        setShowPasswordPrompt(false);
+        setShowWishes(true);
+      } else {
         toast({
           variant: "destructive",
-          title: "Failed to load wishes",
-          description: "Could not retrieve birthday wishes. Please try again later.",
+          title: "Incorrect Password",
+          description: "Sorry, You are not the birthday boy okaaayy",
         });
-      } finally {
-        setIsLoadingWishes(false);
+        setPassword('');
       }
-    } else {
+    } catch (error) {
+      console.error("Failed to fetch wishes:", error);
       toast({
         variant: "destructive",
-        title: "Incorrect Password",
-        description: "Sorry, You are not the birthday boy okaaayy",
+        title: "Failed to load wishes",
+        description: "Could not retrieve birthday wishes. Please try again later.",
       });
-      setPassword('');
+    } finally {
+      setIsLoadingWishes(false);
     }
   };
 

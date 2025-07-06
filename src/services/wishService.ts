@@ -54,6 +54,21 @@ export async function getWishes(): Promise<Wish[]> {
   return snapshot.docs.map(mapDocToWish);
 }
 
+export async function getWishesWithPassword(password: string): Promise<Wish[] | null> {
+  const correctPassword = process.env.WISHES_PASSWORD;
+
+  if (!correctPassword) {
+    console.error("WISHES_PASSWORD environment variable not set.");
+    return null;
+  }
+
+  if (password === correctPassword) {
+    return getWishes();
+  }
+  
+  return null;
+}
+
 export async function addWish(wishData: Omit<Wish, 'id' | 'createdAt'>): Promise<Wish> {
   if (!db) {
     console.warn("Firebase not configured. This wish will not be saved.");
