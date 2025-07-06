@@ -1,7 +1,5 @@
 import { initializeApp, getApps, getApp, type FirebaseApp } from "firebase/app";
 import { getFirestore, type Firestore } from "firebase/firestore";
-import { getStorage, type FirebaseStorage } from "firebase/storage";
-import { getAuth, type Auth } from "firebase/auth";
 
 const firebaseConfig = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
@@ -16,15 +14,11 @@ const isFirebaseConfigured = Object.values(firebaseConfig).every(Boolean);
 
 let app: FirebaseApp | null = null;
 let db: Firestore | null = null;
-let storage: FirebaseStorage | null = null;
-let auth: Auth | null = null;
 
 if (isFirebaseConfigured) {
   try {
     app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
     db = getFirestore(app);
-    storage = getStorage(app);
-    auth = getAuth(app);
     console.log("Firebase initialized successfully.");
   } catch (e) {
     console.error("Failed to initialize Firebase. App will fall back to static data.", e);
@@ -33,4 +27,4 @@ if (isFirebaseConfigured) {
   console.warn("Firebase configuration is incomplete. App will run in offline mode with static data.");
 }
 
-export { db, storage, auth };
+export { db };
