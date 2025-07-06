@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import type { Profile, Category } from '@/lib/types';
+import Image from 'next/image';
 
 import { Button } from "@/components/ui/button";
 import {
@@ -26,7 +27,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { CalendarIcon } from 'lucide-react';
+import { CalendarIcon, User } from 'lucide-react';
 import { Calendar } from '@/components/ui/calendar';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
@@ -36,7 +37,7 @@ const profileSchema = z.object({
   name: z.string().min(2, "Name must be at least 2 characters."),
   birthdate: z.date({ required_error: "A date of birth is required." }),
   description: z.string().min(10, "Description must be at least 10 characters.").max(500, "Description must be less than 500 characters."),
-  photoUrl: z.string().url("Please enter a valid URL.").optional().or(z.literal('')),
+  photoUrl: z.string().optional().or(z.literal('')),
   categoryId: z.string({ required_error: "Please select a category." }),
 });
 
@@ -51,6 +52,9 @@ interface ProfileFormProps {
 }
 
 export default function ProfileForm({ isOpen, setIsOpen, onSave, profile, categories }: ProfileFormProps) {
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
   const form = useForm<ProfileFormValues>({
     resolver: zodResolver(profileSchema),
     defaultValues: {
@@ -61,33 +65,60 @@ export default function ProfileForm({ isOpen, setIsOpen, onSave, profile, catego
   });
 
   useEffect(() => {
-    if (isOpen && profile) {
-      form.reset({
-        name: profile.name,
-        birthdate: parseISO(profile.birthdate),
-        description: profile.description,
-        photoUrl: profile.photoUrl,
-        categoryId: profile.categoryId,
-      });
-    } else if (isOpen && !profile) {
-      form.reset({
-        name: '',
-        birthdate: undefined,
-        description: '',
-        photoUrl: '',
-        categoryId: undefined,
-      });
+    if (isOpen) {
+      if (profile) {
+        form.reset({
+          name: profile.name,
+          birthdate: parseISO(profile.birthdate),
+          description: profile.description,
+          photoUrl: profile.photoUrl,
+          categoryId: profile.categoryId,
+        });
+        setPreviewUrl(profile.photoUrl);
+      } else {
+        form.reset({
+          name: '',
+          birthdate: undefined,
+          description: '',
+          photoUrl: '',
+          categoryId: undefined,
+        });
+        setPreviewUrl(null);
+      }
+    } else {
+      if (previewUrl && previewUrl.startsWith('blob:')) {
+        URL.revokeObjectURL(previewUrl);
+      }
+      setPreviewUrl(null);
     }
   }, [profile, isOpen, form]);
+  
+  const handlePhotoChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      if (previewUrl && previewUrl.startsWith('blob:')) {
+        URL.revokeObjectURL(previewUrl);
+      }
+      const objectUrl = URL.createObjectURL(file);
+      setPreviewUrl(objectUrl);
+      
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        form.setValue('photoUrl', reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
 
   const onSubmit = (data: ProfileFormValues) => {
-    const photoUrl = data.photoUrl || `https://placehold.co/400x400.png`;
+    const finalPhotoUrl = data.photoUrl || `https://placehold.co/400x400.png`;
     onSave({
       name: data.name,
       birthdate: data.birthdate.toISOString(),
       description: data.description,
       categoryId: data.categoryId,
-      photoUrl: photoUrl,
+      photoUrl: finalPhotoUrl,
     });
     setIsOpen(false);
   };
@@ -196,19 +227,36 @@ export default function ProfileForm({ isOpen, setIsOpen, onSave, profile, catego
                 </FormItem>
               )}
             />
-             <FormField
-              control={form.control}
-              name="photoUrl"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Photo URL</FormLabel>
-                  <FormControl>
-                    <Input placeholder="https://example.com/photo.jpg" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+            <FormItem>
+              <FormLabel>Photo</FormLabel>
+              <div className="flex items-center gap-4">
+                {previewUrl ? (
+                  <Image
+                    src={previewUrl}
+                    alt="Profile preview"
+                    width={64}
+                    height={64}
+                    className="h-16 w-16 rounded-full object-cover"
+                    data-ai-hint="person portrait"
+                  />
+                ) : (
+                  <div className="h-16 w-16 rounded-full bg-muted flex items-center justify-center">
+                    <User className="h-8 w-8 text-muted-foreground" />
+                  </div>
+                )}
+                <FormControl>
+                  <Input
+                    type="file"
+                    accept="image/png, image/jpeg, image/gif"
+                    className="flex-1"
+                    onChange={handlePhotoChange}
+                    ref={fileInputRef}
+                  />
+                </FormControl>
+              </div>
+              <FormMessage />
+            </FormItem>
+
             <DialogFooter>
               <Button type="button" variant="ghost" onClick={() => setIsOpen(false)}>Cancel</Button>
               <Button type="submit" className="bg-accent hover:bg-accent/90">Save</Button>

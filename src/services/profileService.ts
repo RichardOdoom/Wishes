@@ -1,7 +1,8 @@
 'use server';
 
-import { db } from '@/lib/firebase';
+import { db, storage } from '@/lib/firebase';
 import { collection, getDocs, doc, setDoc, addDoc, query, writeBatch } from 'firebase/firestore';
+import { ref, uploadString, getDownloadURL } from 'firebase/storage';
 import type { Profile } from '@/lib/types';
 import { initialProfiles } from '@/lib/store';
 
@@ -20,6 +21,17 @@ async function seedProfiles() {
 
   await batch.commit();
   console.log('Database seeded successfully!');
+}
+
+async function uploadPhoto(photoDataUrl: string, profileId: string): Promise<string> {
+  if (!storage) {
+      console.warn("Firebase Storage not available. Returning placeholder or original URL.");
+      return photoDataUrl;
+  }
+  const storageRef = ref(storage, `profile-photos/${profileId}/${Date.now()}`);
+  const snapshot = await uploadString(storageRef, photoDataUrl, 'data_url');
+  const downloadURL = await getDownloadURL(snapshot.ref);
+  return downloadURL;
 }
 
 export async function getProfiles(): Promise<Profile[]> {
@@ -47,9 +59,22 @@ export async function addProfile(profileData: Omit<Profile, 'id'>): Promise<Prof
     const newProfile = { ...profileData, id: `static-id-${Date.now()}` };
     return newProfile;
   }
-  const profilesCollection = collection(db, PROFILES_COLLECTION);
-  const docRef = await addDoc(profilesCollection, profileData);
-  return { id: docRef.id, ...profileData } as Profile;
+
+  const docRef = doc(collection(db, PROFILES_COLLECTION));
+  const newId = docRef.id;
+  let finalPhotoUrl = profileData.photoUrl;
+
+  if (profileData.photoUrl.startsWith('data:image')) {
+    finalPhotoUrl = await uploadPhoto(profileData.photoUrl, newId);
+  }
+
+  const finalProfileData = {
+    ...profileData,
+    photoUrl: finalPhotoUrl,
+  };
+  
+  await setDoc(docRef, finalProfileData);
+  return { id: newId, ...finalProfileData };
 }
 
 export async function updateProfile(profile: Profile): Promise<Profile> {
@@ -57,8 +82,15 @@ export async function updateProfile(profile: Profile): Promise<Profile> {
     console.warn("Firebase not configured. This update will not be saved.");
     return profile;
   }
-  const profileDoc = doc(db, PROFILES_COLLECTION, profile.id);
-  const { id, ...profileData } = profile;
+
+  let finalProfile = { ...profile };
+
+  if (profile.photoUrl.startsWith('data:image')) {
+    finalProfile.photoUrl = await uploadPhoto(profile.photoUrl, profile.id);
+  }
+
+  const profileDoc = doc(db, PROFILES_COLLECTION, finalProfile.id);
+  const { id, ...profileData } = finalProfile;
   await setDoc(profileDoc, profileData, { merge: true });
-  return profile;
+  return finalProfile;
 }
