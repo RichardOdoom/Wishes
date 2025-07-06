@@ -2,9 +2,9 @@
 
 import { useState, useEffect } from 'react';
 import type { Wish } from '@/lib/types';
-import { getWishes, addWish } from '@/services/profileService';
-import WishForm from './ProfileForm';
-import WishCard from './ProfileCard';
+import { getWishes, addWish } from '@/services/wishService';
+import WishForm from './WishForm';
+import WishCard from './WishCard';
 import { useToast } from "@/hooks/use-toast";
 import { Skeleton } from './ui/skeleton';
 import { PartyPopper } from 'lucide-react';
