@@ -21,7 +21,7 @@ const wishSchema = z.object({
 type WishFormValues = z.infer<typeof wishSchema>;
 
 interface WishFormProps {
-  onWishAdded: (newWish: Wish) => void;
+  onWishAdded: () => void;
   addWishAction: (wishData: Omit<Wish, 'id' | 'createdAt'>) => Promise<Wish>;
 }
 
@@ -40,8 +40,8 @@ export default function WishForm({ onWishAdded, addWishAction }: WishFormProps) 
   const onSubmit = async (data: WishFormValues) => {
     setIsSubmitting(true);
     try {
-      const newWish = await addWishAction(data);
-      onWishAdded(newWish);
+      await addWishAction(data);
+      onWishAdded();
       toast({
         title: "Wish sent!",
         description: "Thank you for your birthday wish!",
