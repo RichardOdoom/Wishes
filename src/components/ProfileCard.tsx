@@ -1,80 +1,39 @@
 "use client";
 
-import Image from 'next/image';
-import type { Profile } from '@/lib/types';
-import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Cake } from 'lucide-react';
+import type { Wish } from '@/lib/types';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Heart } from 'lucide-react';
+import { formatDistanceToNow } from 'date-fns';
 import { useState, useEffect } from 'react';
-import ProfileDetail from './ProfileDetail';
-import { Skeleton } from './ui/skeleton';
-import { parseISO } from 'date-fns';
 
-interface ProfileCardProps {
-  profile: Profile;
-  onEdit: (profile: Profile) => void;
+interface WishCardProps {
+  wish: Wish;
 }
 
-export default function ProfileCard({ profile, onEdit }: ProfileCardProps) {
-  const [isDetailOpen, setIsDetailOpen] = useState(false);
-  const [isBirthday, setIsBirthday] = useState(false);
-  const [birthDateString, setBirthDateString] = useState('');
-
+export default function ProfileCard({ wish }: WishCardProps) {
+  const [timeAgo, setTimeAgo] = useState('');
+  
   useEffect(() => {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-
-    const birthdate = parseISO(profile.birthdate);
-
-    const isBirthdayToday =
-      birthdate.getDate() === today.getDate() &&
-      birthdate.getMonth() === today.getMonth();
-    setIsBirthday(isBirthdayToday);
-
-    setBirthDateString(birthdate.toLocaleDateString('en-US', {
-      month: 'long',
-      day: 'numeric',
-    }));
-  }, [profile.birthdate]);
+    if (wish.createdAt) {
+      const date = new Date(wish.createdAt);
+      if (!isNaN(date.getTime())) {
+        setTimeAgo(formatDistanceToNow(date, { addSuffix: true }));
+      }
+    }
+  }, [wish.createdAt]);
 
   return (
-    <>
-      <Card 
-        className="overflow-hidden shadow-lg hover:shadow-2xl transition-shadow duration-300 cursor-pointer flex flex-col group"
-        onClick={() => setIsDetailOpen(true)}
-      >
-        <CardHeader className="p-0 relative">
-          <Image
-            src={profile.photoUrl}
-            alt={profile.name}
-            width={400}
-            height={400}
-            className="aspect-square object-cover w-full transition-transform duration-300 group-hover:scale-105"
-            data-ai-hint="person portrait"
-          />
-          {isBirthday && (
-            <Badge className="absolute top-2 right-2 bg-primary text-primary-foreground animate-pulse">
-              <Cake className="mr-2 h-4 w-4" />
-              Happy Birthday!
-            </Badge>
-          )}
-        </CardHeader>
-        <CardContent className="p-4 flex-grow">
-          <CardTitle className="text-2xl font-headline">{profile.name}</CardTitle>
-        </CardContent>
-        <CardFooter className="p-4 pt-0">
-          {birthDateString ? 
-            <p className="text-sm text-muted-foreground">{birthDateString}</p>
-            : <Skeleton className="h-4 w-24" />
-          }
-        </CardFooter>
-      </Card>
-      <ProfileDetail 
-        isOpen={isDetailOpen}
-        setIsOpen={setIsDetailOpen}
-        profile={profile}
-        onEdit={onEdit}
-      />
-    </>
+    <Card className="shadow-lg break-inside-avoid bg-card/80 backdrop-blur-sm">
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2 text-xl font-headline text-card-foreground">
+          <Heart className="text-destructive fill-destructive" />
+          {wish.name}
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        <p className="text-muted-foreground mb-4 text-lg">"{wish.message}"</p>
+        <p className="text-xs text-muted-foreground/80 text-right">{timeAgo}</p>
+      </CardContent>
+    </Card>
   );
 }

@@ -1,183 +1,95 @@
 "use client";
 
-import { useState, useEffect, useMemo } from 'react';
-import { initialCategories } from '@/lib/store';
-import type { Profile, Category } from '@/lib/types';
-import { Button } from '@/components/ui/button';
-import { Card } from '@/components/ui/card';
-import { PlusCircle, Gift, Loader2 } from 'lucide-react';
-import { differenceInDays, parseISO } from 'date-fns';
+import { useState, useEffect } from 'react';
+import type { Wish } from '@/lib/types';
+import { getWishes, addWish } from '@/services/profileService';
+import WishForm from './ProfileForm';
+import WishCard from './ProfileCard';
 import { useToast } from "@/hooks/use-toast";
-import ProfileCard from './ProfileCard';
-import ProfileForm from './ProfileForm';
-import { getProfiles, addProfile, updateProfile } from '@/services/profileService';
 import { Skeleton } from './ui/skeleton';
+import { PartyPopper } from 'lucide-react';
+import { Card } from './ui/card';
 
 export default function BirthdayDashboard() {
-  const [profiles, setProfiles] = useState<Profile[]>([]);
+  const [wishes, setWishes] = useState<Wish[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [categories] = useState<Category[]>(initialCategories);
-  const [selectedCategory, setSelectedCategory] = useState<string>('all');
-  const [isFormOpen, setIsFormOpen] = useState(false);
-  const [editingProfile, setEditingProfile] = useState<Profile | null>(null);
-
   const { toast } = useToast();
 
   useEffect(() => {
-    async function loadProfiles() {
+    async function loadWishes() {
       try {
         setIsLoading(true);
-        const fetchedProfiles = await getProfiles();
-        setProfiles(fetchedProfiles);
+        const fetchedWishes = await getWishes();
+        setWishes(fetchedWishes);
       } catch (error) {
-        console.error("Failed to fetch profiles:", error);
+        console.error("Failed to fetch wishes:", error);
         toast({
           variant: "destructive",
-          title: "Failed to load data",
-          description: "Could not retrieve birthday profiles. Please try again later.",
+          title: "Failed to load wishes",
+          description: "Could not retrieve birthday wishes. Please try again later.",
         });
       } finally {
         setIsLoading(false);
       }
     }
-    loadProfiles();
+    loadWishes();
   }, [toast]);
-
-
-  useEffect(() => {
-    if (isLoading) return;
-
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-
-    profiles.forEach(profile => {
-      const birthdate = parseISO(profile.birthdate);
-      const birthDateThisYear = new Date(today.getFullYear(), birthdate.getMonth(), birthdate.getDate());
-      const nextBirthday = birthDateThisYear < today
-        ? new Date(today.getFullYear() + 1, birthdate.getMonth(), birthdate.getDate())
-        : birthDateThisYear;
-      
-      const daysUntil = differenceInDays(nextBirthday, today);
-
-      if (daysUntil > 0 && daysUntil <= 7) {
-        toast({
-          title: "Upcoming Birthday!",
-          description: `${profile.name}'s birthday is in ${daysUntil} day${daysUntil > 1 ? 's' : ''}!`,
-          action: (
-            <div className="text-2xl">
-              <Gift className="text-primary" />
-            </div>
-          ),
-        });
-      }
-    });
-  }, [profiles, toast, isLoading]);
-
-  const handleSaveProfile = async (profileData: Omit<Profile, 'id'>) => {
-    try {
-      if (editingProfile) {
-        const updatedProfile = await updateProfile({ ...profileData, id: editingProfile.id });
-        setProfiles(profiles.map(p => (p.id === updatedProfile.id ? updatedProfile : p)));
-        toast({ title: "Profile updated!" });
-      } else {
-        const newProfile = await addProfile(profileData);
-        setProfiles([...profiles, newProfile]);
-        toast({ title: "Profile added!" });
-      }
-      setEditingProfile(null);
-    } catch (error) {
-      console.error("Failed to save profile:", error);
-      toast({
-        variant: "destructive",
-        title: "Save failed",
-        description: "Could not save the profile. Please try again.",
-      });
-    }
+  
+  const handleWishAdded = (newWish: Wish) => {
+    setWishes(prevWishes => [newWish, ...prevWishes]);
   };
 
-  const handleAddNew = () => {
-    setEditingProfile(null);
-    setIsFormOpen(true);
-  }
-
-  const handleEdit = (profile: Profile) => {
-    setEditingProfile(profile);
-    setIsFormOpen(true);
-  }
-
-  const filteredProfiles = useMemo(() => {
-    if (selectedCategory === 'all') {
-      return profiles;
-    }
-    return profiles.filter(p => p.categoryId === selectedCategory);
-  }, [profiles, selectedCategory]);
-  
-
   return (
-    <div className="flex min-h-screen w-full bg-background font-body">
-      <aside className="hidden md:flex flex-col w-64 p-4 bg-card border-r">
-        <h2 className="text-2xl font-bold mb-6 font-headline text-primary-foreground/80">Categories</h2>
-        <nav className="flex flex-col gap-2">
-          {categories.map(category => (
-            <Button
-              key={category.id}
-              variant={selectedCategory === category.id ? 'default' : 'ghost'}
-              className="justify-start gap-3"
-              onClick={() => setSelectedCategory(category.id)}
-            >
-              <category.icon className="h-5 w-5" />
-              <span>{category.name}</span>
-            </Button>
-          ))}
-        </nav>
-      </aside>
+    <div className="flex flex-col items-center min-h-screen w-full bg-transparent font-body p-4 md:p-10">
+      <header className="text-center my-8 md:my-12">
+        <h1 className="text-5xl md:text-7xl font-bold font-headline text-primary">Happy Birthday, Richard!</h1>
+        <p className="text-muted-foreground text-lg md:text-xl mt-4 max-w-3xl mx-auto">
+          Today is my special day, and I'd love to celebrate with you! Please leave a birthday wish for me in the form below. Your messages mean the world to me.
+        </p>
+      </header>
+      
+      <div className="w-full max-w-2xl mb-12 z-10">
+        <WishForm onWishAdded={handleWishAdded} addWishAction={addWish} />
+      </div>
 
-      <div className="flex-1 p-6 md:p-10">
-        <header className="flex items-center justify-between mb-8">
-          <h1 className="text-4xl font-bold font-headline text-primary-foreground/90">It'z Richard's Birthday</h1>
-          <Button onClick={handleAddNew} className="bg-accent hover:bg-accent/90 text-accent-foreground">
-            <PlusCircle className="mr-2 h-5 w-5" />
-            Add Loved One
-          </Button>
-        </header>
-
+      <div className="w-full max-w-6xl">
+        <h2 className="text-3xl font-bold font-headline text-primary-foreground/90 mb-8 text-center flex items-center justify-center gap-3">
+          <PartyPopper className="h-8 w-8 text-accent"/>
+          The Wish Wall
+          <PartyPopper className="h-8 w-8 text-accent"/>
+        </h2>
         {isLoading ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                {[...Array(4)].map((_, i) => (
-                    <Card key={i}>
-                        <Skeleton className="w-full h-56"/>
-                        <div className="p-4 space-y-2">
-                            <Skeleton className="h-6 w-1/2"/>
-                            <Skeleton className="h-4 w-1/3"/>
-                        </div>
-                    </Card>
-                ))}
-            </div>
-        ) : filteredProfiles.length > 0 ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-            {filteredProfiles.map(profile => (
-              <ProfileCard key={profile.id} profile={profile} onEdit={handleEdit} />
+          <div className="columns-1 sm:columns-2 lg:columns-3 gap-6">
+            {[...Array(6)].map((_, i) => (
+              <Card key={i} className="mb-6 break-inside-avoid">
+                  <div className="p-6 space-y-4">
+                      <div className="flex items-center gap-2">
+                          <Skeleton className="h-6 w-6 rounded-full"/>
+                          <Skeleton className="h-6 w-1/3"/>
+                      </div>
+                      <Skeleton className="h-4 w-full"/>
+                      <Skeleton className="h-4 w-5/6"/>
+                      <Skeleton className="h-4 w-3/4"/>
+                  </div>
+              </Card>
+            ))}
+          </div>
+        ) : wishes.length > 0 ? (
+          <div className="columns-1 sm:columns-2 lg:columns-3 gap-6 space-y-6">
+            {wishes.map(wish => (
+              <WishCard key={wish.id} wish={wish} />
             ))}
           </div>
         ) : (
-          <Card className="flex flex-col items-center justify-center p-12 text-center">
-            <h3 className="text-xl font-semibold mb-2">No profiles yet</h3>
-            <p className="text-muted-foreground mb-4">Add a loved one to get started!</p>
-            <Button onClick={handleAddNew} variant="outline">
-              <PlusCircle className="mr-2 h-4 w-4" />
-              Add Loved One
-            </Button>
+          <Card className="flex flex-col items-center justify-center p-12 text-center bg-card">
+            <h3 className="text-xl font-semibold mb-2">The wall is empty!</h3>
+            <p className="text-muted-foreground">Be the first one to leave a birthday wish for Richard.</p>
           </Card>
         )}
       </div>
-
-      <ProfileForm 
-        isOpen={isFormOpen}
-        setIsOpen={setIsFormOpen}
-        onSave={handleSaveProfile}
-        profile={editingProfile}
-        categories={categories.filter(c => c.id !== 'all')}
-      />
+       <footer className="mt-12 text-center text-muted-foreground text-sm">
+        <p>Made with ❤️ for Richard's Birthday.</p>
+      </footer>
     </div>
   );
 }

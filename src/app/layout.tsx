@@ -3,8 +3,8 @@ import './globals.css';
 import { Toaster } from "@/components/ui/toaster";
 
 export const metadata: Metadata = {
-  title: "Itz Richard's Birthday",
-  description: "Never forget a loved one's birthday again.",
+  title: "Happy Birthday, Richard!",
+  description: "Leave a birthday wish for Richard!",
 };
 
 export default function RootLayout({
